@@ -1,0 +1,10 @@
+version: 0.1
+
+phases:
+  install:
+    commands:
+    - aws cloudformation package --template-file samTemplate.yaml --s3-bucket pluto-lambda-pipeline --output-template-file outputSamTemplate.yaml
+artifacts:
+  files:
+    - samTemplate.yaml
+    - outputSamTemplate.yaml
