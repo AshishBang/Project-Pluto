@@ -1,0 +1,104 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: know the ec2 instances running status
+Parameters:
+  CustomerName:
+    Description: Customer Name
+    Type: String
+    Default: customer
+  ProjectName:
+    Description: Project Name
+    Type: String
+    Default: test
+  ENV:
+    Description: 'Environment (dev, prd)'
+    Type: String
+    Default: dev
+  emailsender:
+    Description: source email id
+    Default: source
+    Type: String
+  emailreceiver:
+    Description: destination email id
+    Type: String
+    Default: destination
+Resources:
+  LambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - s3.amazonaws.com
+                - ses.amazonaws.com
+                - ec2.amazonaws.com
+                - events.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path:
+        'Fn::Sub': '/${ProjectName}/'
+      Policies:
+        - PolicyName:
+            'Fn::Sub': '${AWS::StackName}'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+                Effect: Allow
+                Action:
+                  - 'ec2:DescribeInstances'
+                  - 'cloudwatch:*'
+                  - 'ec2:DescribeRegions'
+                  - 'ses:SendRawEmail'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'cloudformation:*'
+                Resource: '*'
+  ScheduledRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "ScheduledRule"
+      ScheduleExpression: "rate(1 day)"
+      State: "ENABLED"
+      Targets: 
+      - 
+        Arn: 
+          Fn::GetAtt: 
+            - "LambdaFunction"
+            - "Arn"
+        Id: "TargetFunctionV1"
+  LambdaFunction:
+    Type: 'AWS::Lambda::Function' 
+    Properties: 
+      Handler: lambda_function.lambda_handler
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaRole"
+          - "Arn"
+      Environment:
+        Variables:
+          SOURCE_EMAIL_ID: !Ref emailsender
+          DESTINATION_EMAIL_ID: !Ref emailreceiver          
+      Code:
+        S3Bucket: "awsashishs3"
+        S3Key: "lambda_function.zip"
+      Description: Test with Cloud Formation
+      MemorySize: 128
+      Runtime: python2.7
+      Timeout: 60
+  LambdaInvokePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName:
+        'Fn::GetAtt':
+          - LambdaFunction
+          - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: 
+        Fn::GetAtt: 
+          - ScheduledRule
+          - Arn
+
+
